@@ -1,5 +1,6 @@
 package com.sayales.bot
 
+import com.sayales.app.SecuredValue
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.PropertySource
 import org.springframework.stereotype.Component
@@ -31,7 +32,7 @@ class PropertyOptionsProvider : OptionsProvider {
     @Value("\${proxy.username}")
     private val proxyUser: String = ""
 
-    @Value("\${proxy.secret}")
+    @SecuredValue("\${proxy.secret}", "BOT_TOKEN_KEY")
     private val proxySecret: String = ""
 
 

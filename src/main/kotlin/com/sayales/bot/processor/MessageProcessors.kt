@@ -1,41 +1,46 @@
 package com.sayales.bot.processor
 
-import com.google.common.cache.Cache
-import com.google.common.cache.CacheBuilder
 import com.sayales.bot.BotExecutor
-import com.sayales.bot.ContentTimeSettingsController
+import com.sayales.bot.ContentTimeSettingsService
 import com.sayales.bot.ContentType
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage
 import org.telegram.telegrambots.meta.api.objects.Message
-import java.util.*
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.collections.HashMap
-import kotlin.concurrent.schedule
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 interface MessageProcessor {
     fun pushMessage(message: Message, botExecutor: BotExecutor);
 }
 
 @Component
-class CacheBasedMessageProcessor(@Autowired val timeSettingsController: ContentTimeSettingsController) : MessageProcessor {
+class CacheBasedMessageProcessor(@Autowired val timeSettingsService: ContentTimeSettingsService) : MessageProcessor {
 
+
+    private val logger = LoggerFactory.getLogger(MessageProcessor::class.java)
 
     private val messageMap = ConcurrentHashMap<Int, ProcessableMessage>()
 
-    //TODO: threadpool
+    private val scheduler = Executors.newScheduledThreadPool(50);
+
+
     override fun pushMessage(message: Message, botExecutor: BotExecutor) {
         messageMap[message.messageId] = ProcessableMessage(message, ::deleteMessage)
-        val deleteTime = timeSettingsController.getContentTime(getContentType(message))
-        if (deleteTime >= 0) {
-            Timer().schedule(deleteTime) {
-                messageMap[message.messageId]?.let { it.processCallback.invoke(botExecutor, it.message) }
-            }
+        val liveTime = timeSettingsService.getContentTime(getContentType(message), message.chatId.toString())
+        if (liveTime >= 0) {
+            scheduler.schedule({
+                messageMap[message.messageId]?.let {
+                    it.processCallback.invoke(botExecutor, it.message)
+                }
+            }, liveTime, TimeUnit.SECONDS);
         }
     }
 
     private fun deleteMessage(botExecutor: BotExecutor, message: Message) {
+        logger.info("Delete message $message")
         val deleteMessage = DeleteMessage()
         deleteMessage.chatId = message.chatId.toString()
         deleteMessage.messageId = message.messageId
@@ -45,8 +50,9 @@ class CacheBasedMessageProcessor(@Autowired val timeSettingsController: ContentT
 
     fun getContentType(message: Message) = when {
         message.hasVideo() -> ContentType.VIDEO
-        message.hasAnimation() -> ContentType.GIF
         message.hasPhoto() -> ContentType.PHOTO
+        message.hasAnimation() -> ContentType.GIF
+        message.hasVideoNote() -> ContentType.VIDEO_NOTE
         message.hasSticker() -> ContentType.STICKER
         else -> ContentType.TEXT
     }

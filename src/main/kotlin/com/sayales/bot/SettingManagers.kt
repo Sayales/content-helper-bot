@@ -1,55 +1,46 @@
 package com.sayales.bot
 
 
+import com.sayales.bot.storage.ao.TimeoutSettingsAO
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component
-import java.util.concurrent.ConcurrentHashMap
-import java.util.stream.Collectors
+import org.springframework.stereotype.Service
 
 
 private val logger = LoggerFactory.getLogger("com.sayales.bot.SettingsManagers")
 
 
-interface ContentTimeSettingsController
-{
-    fun setContentTime(cmd: String): String
-    fun getContentTime(type: ContentType): Long
-    fun getInfo(): String
+interface ContentTimeSettingsService {
+    fun setContentTime(cmd: String, chatId: String): String
+    fun getContentTime(type: ContentType, chatId: String): Long
+    fun getInfo(chatId: String): String
 }
 
-interface TimeoutSettingsStorage
-{
-    fun put(type: ContentType, timeout: Long)
-    fun get(type: ContentType) : Long
-    fun getInfo(): String
-}
 
-@Component
-class CommandSettingsController(@Autowired val storage: TimeoutSettingsStorage): ContentTimeSettingsController
-{
+@Service
+class CommandSettingsService(@Autowired val propertySettingAO: TimeoutSettingsAO) : ContentTimeSettingsService {
 
-    override fun setContentTime(cmd: String): String {
+    override fun setContentTime(cmd: String, chatId: String): String {
         val tokens = cmd.split(" ")
         return when {
-            tokens.size == 1 -> tryInfoCommand(tokens)
-            tokens.size == 2 -> setContentTime(tokens[0], tokens[1])
-            else ->"Wrong command $cmd"
+            tokens.size == 1 -> tryInfoCommand(tokens, chatId)
+            tokens.size == 2 -> setContentTime(tokens[0], chatId, tokens[1])
+            else -> "Wrong command $cmd"
         }
     }
 
-    override fun getContentTime(type: ContentType): Long {
-        return storage.get(type) ?: 0
+    override fun getContentTime(type: ContentType, chatId: String): Long {
+        return propertySettingAO.get(type, chatId)
     }
 
-    override fun getInfo(): String {
-        return storage.getInfo() ?: "";
+    override fun getInfo(chatId: String): String {
+        return propertySettingAO.getInfo(chatId);
     }
 
-    fun setContentTime(typeName: String, timeout: String): String {
+    fun setContentTime(typeName: String, chatId: String, timeout: String): String {
         return try {
-            storage.put(ContentType.valueOf(typeName.toUpperCase()), timeout.toLong())
+            propertySettingAO.put(ContentType.valueOf(typeName.toUpperCase()), chatId, timeout.toLong())
             logger.info("Stored settings for $typeName, timeout = $timeout")
             "New timeout for $typeName, timeout = $timeout"
         } catch (e: Exception) {
@@ -58,30 +49,10 @@ class CommandSettingsController(@Autowired val storage: TimeoutSettingsStorage):
         }
     }
 
-    private fun tryInfoCommand(tokens: List<String>) = when {
-        tokens[0] == "info" -> getInfo()
+    private fun tryInfoCommand(tokens: List<String>, chatId: String) = when {
+        tokens[0] == "info" -> getInfo(chatId)
         else -> "Wrong command $tokens"
     }
 }
 
 
-
-@Component
-class MemorySettingStorage : TimeoutSettingsStorage{
-
-    private val storage = ConcurrentHashMap<ContentType, Long>()
-
-
-    override fun put(type: ContentType, timeout: Long) {
-        storage[type] = timeout
-    }
-
-    override fun get(type: ContentType): Long {
-        return storage[type] ?: -1
-    }
-
-    override fun getInfo(): String {
-        return storage.entries.stream().map{ "${it.key} : ${it.value} msc"}.collect(Collectors.joining("\n"))
-    }
-
-}
