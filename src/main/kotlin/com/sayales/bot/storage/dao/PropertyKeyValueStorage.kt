@@ -1,8 +1,8 @@
 package com.sayales.bot.storage.dao
 
 import com.sayales.app.SecuredValue
-import com.sayales.bot.storage.ao.TimeSettingsKey
 import com.sayales.bot.storage.ao.lock
+import com.sayales.bot.storage.domain.TimeSettingsKey
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
@@ -84,13 +84,3 @@ abstract class PropertyKeyValueStorage<K, V>(
         outputStream.close()
     }
 }
-
-@Component
-class LifetimePropertyStorage(@Value("\${storage.properties.path}") val propPath: String,
-                              @Value("\${storage.properties.delimiter}") val keyDelimiter: String) :
-    PropertyKeyValueStorage<TimeSettingsKey, Long>(
-        propPath,
-        { it.contentType.name + keyDelimiter + it.chatId },
-        { it?.toLong() },
-        Long::toString
-    )

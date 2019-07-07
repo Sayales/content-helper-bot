@@ -3,6 +3,7 @@ package com.sayales.bot.storage.ao
 import com.google.common.cache.CacheBuilder
 import com.sayales.bot.ContentType
 import com.sayales.bot.storage.dao.PropertyTimeoutSettingsDAO
+import com.sayales.bot.storage.domain.TimeSettingsKey
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
@@ -71,4 +72,3 @@ inline fun <T> lock(lock: Lock,action: () -> T): T {
     return res
 }
 
-data class TimeSettingsKey(val contentType: ContentType, val chatId: String)
